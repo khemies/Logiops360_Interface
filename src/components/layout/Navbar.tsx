@@ -7,6 +7,7 @@ import {
   LogOut,
   Activity
 } from "lucide-react";
+import logoImage from "@/assets/logiops360-logo.png";
 
 interface NavbarProps {
   currentProfile: string;
@@ -61,11 +62,12 @@ export const Navbar = ({ currentProfile, currentView, onViewChange, onLogout }: 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center space-x-8">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary-glow rounded-lg flex items-center justify-center">
-                <Activity className="h-5 w-5 text-white" />
-              </div>
-              <span className="text-xl font-bold text-primary">LogiOps</span>
+            <div className="flex items-center space-x-3">
+              <img 
+                src={logoImage} 
+                alt="LogiOps 360 Logo" 
+                className="h-8"
+              />
             </div>
             
             <div className="flex space-x-1">
