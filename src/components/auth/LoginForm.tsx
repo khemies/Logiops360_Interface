@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
+import logo from "@/assets/logiops360-logo.png";
 
 interface LoginFormProps {
   onLogin: (profile: string) => void;
@@ -69,8 +70,9 @@ export const LoginForm = ({ onLogin }: LoginFormProps) => {
     <div className="min-h-screen flex items-center justify-center p-4" 
          style={{ background: 'var(--gradient-bg)' }}>
       <Card className="w-full max-w-md" style={{ boxShadow: 'var(--shadow-elegant)' }}>
-        <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-bold text-primary">LogiOps</CardTitle>
+        <CardHeader className="text-center space-y-2">
+          <img src={logo} alt="Logo LogiOps360" className="mx-auto h-12 w-auto" loading="lazy" />
+          <CardTitle className="text-3xl font-bold text-primary">LogiOps360</CardTitle>
           <CardDescription className="text-lg">
             Gestion intelligente de la supply chain
           </CardDescription>
