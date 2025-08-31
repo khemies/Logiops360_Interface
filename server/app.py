@@ -32,7 +32,7 @@ DATABASE_URL = (
 )
 
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-me-in-prod")
-CORS_ORIGIN = os.getenv("CORS_ORIGIN", "http://localhost:5173")
+CORS_ORIGIN = os.getenv("CORS_ORIGIN", "http://10.188.54.232:8080")
 
 
 # ----------------------------------------------------------------------------
@@ -48,17 +48,6 @@ jwt = JWTManager(app)
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = scoped_session(sessionmaker(bind=engine, autoflush=False, autocommit=False))
-
-
-@app.before_first_request
-def init_db() -> None:
-    # Create tables if they don't exist
-    Base.metadata.create_all(bind=engine)
-
-
-@app.teardown_appcontext
-def remove_session(exception=None):
-    SessionLocal.remove()
 
 
 # ----------------------------------------------------------------------------
@@ -92,6 +81,8 @@ def health():
 @app.post("/api/auth/signup")
 def signup():
     data = request.get_json(force=True) or {}
+    # 🔹 Log côté serveur pour vérifier ce que Flask reçoit
+    print("Données reçues pour signup:", data)
     nom = (data.get("nom") or "").strip()
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or data.get("mot_de_passe") or ""
@@ -139,7 +130,11 @@ def signup():
         )
         return (
             jsonify(
-                id=str(user.id), nom=user.nom, email=user.email, type_profil=user.type_profil, token=token
+                id=str(user.id),
+                nom=user.nom,
+                email=user.email,
+                type_profil=user.type_profil,
+                token=token
             ),
             201,
         )
@@ -153,6 +148,7 @@ def signup():
 @app.post("/api/auth/login")
 def login():
     data = request.get_json(force=True) or {}
+
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or data.get("mot_de_passe") or ""
     type_profil = data.get("type_profil") or data.get("profile") or ""
@@ -185,7 +181,11 @@ def login():
         )
         return (
             jsonify(
-                id=str(user.id), nom=user.nom, email=user.email, type_profil=user.type_profil, token=token
+                id=str(user.id),
+                nom=user.nom,
+                email=user.email,
+                type_profil=user.type_profil,
+                token=token
             ),
             200,
         )
@@ -205,13 +205,27 @@ def me():
         if not user:
             return jsonify(message="Utilisateur introuvable"), 404
         return (
-            jsonify(id=str(user.id), nom=user.nom, email=user.email, type_profil=user.type_profil, date_creation=user.date_creation.isoformat()),
+            jsonify(
+                id=str(user.id),
+                nom=user.nom,
+                email=user.email,
+                type_profil=user.type_profil,
+                date_creation=user.date_creation.isoformat()
+            ),
             200,
         )
     finally:
         session.close()
 
 
+# ----------------------------------------------------------------------------
+# Main
+# ----------------------------------------------------------------------------
+def init_db() -> None:
+    """Créer les tables si elles n'existent pas encore."""
+    Base.metadata.create_all(bind=engine)
+
+
 if __name__ == "__main__":
-    # Dev server
-    app.run(host="0.0.0.0", port=8000, debug=True)
+    init_db()  # Initialisation DB avant de lancer Flask
+    app.run(host="127.0.0.1", port=8000, debug=True)

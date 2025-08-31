@@ -39,6 +39,8 @@ export const LoginForm = ({ onLogin }: LoginFormProps) => {
       return;
     }
 
+    // 🔹 Log côté React pour vérifier ce qu'on envoie
+  console.log("Données envoyées au serveur:", { nom, email, password, profile });
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
@@ -77,7 +79,8 @@ export const LoginForm = ({ onLogin }: LoginFormProps) => {
       });
       return;
     }
-
+   // 🔹 Log côté React pour vérifier ce qu'on envoie
+   console.log("Données envoyées au serveur:", { nom, email, password, profile });
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/signup`, {
         method: "POST",
