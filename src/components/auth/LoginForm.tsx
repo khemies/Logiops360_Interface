@@ -8,6 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import logo from "@/assets/logiops360-logo.png";
 
+const API_BASE_URL = "http://localhost:8000";
+
 interface LoginFormProps {
   onLogin: (profile: string) => void;
 }
@@ -26,44 +28,82 @@ export const LoginForm = ({ onLogin }: LoginFormProps) => {
   const [nom, setNom] = useState("");
   const { toast } = useToast();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password || !profile) {
       toast({
         title: "Erreur",
         description: "Veuillez remplir tous les champs",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
-    
-    // Simulation de connexion
-    onLogin(profile);
-    toast({
-      title: "Connexion réussie",
-      description: `Bienvenue dans LogiOps`,
-      variant: "default"
-    });
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, type_profil: profile }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.message || "Échec de la connexion");
+      }
+
+      localStorage.setItem("auth_token", data.token);
+      localStorage.setItem(
+        "auth_user",
+        JSON.stringify({ id: data.id, nom: data.nom, email: data.email, type_profil: data.type_profil })
+      );
+
+      onLogin(profile);
+      toast({
+        title: "Connexion réussie",
+        description: `Bienvenue dans LogiOps360${data?.nom ? ", " + data.nom : ""}`,
+      });
+    } catch (err: any) {
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+    }
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password || !nom || !profile) {
       toast({
         title: "Erreur",
         description: "Veuillez remplir tous les champs",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
 
-    // Simulation de création de compte
-    onLogin(profile);
-    toast({
-      title: "Compte créé avec succès",
-      description: `Bienvenue dans LogiOps, ${nom}`,
-      variant: "default"
-    });
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nom, email, password, type_profil: profile }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.message || "Échec de la création de compte");
+      }
+
+      localStorage.setItem("auth_token", data.token);
+      localStorage.setItem(
+        "auth_user",
+        JSON.stringify({ id: data.id, nom: data.nom, email: data.email, type_profil: data.type_profil })
+      );
+
+      onLogin(profile);
+      toast({
+        title: "Compte créé avec succès",
+        description: `Bienvenue dans LogiOps360, ${nom}`,
+      });
+    } catch (err: any) {
+      toast({ title: "Erreur", description: err.message, variant: "destructive" });
+    }
   };
 
   return (
