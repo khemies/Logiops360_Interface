@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from datetime import timedelta
-
+from ml_eta_api import bp_eta
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import (
@@ -14,15 +14,19 @@ from flask_jwt_extended import (
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import scoped_session, sessionmaker
 from passlib.hash import bcrypt
-
+import pandas as pd 
 from models import Base, User, TypeProfil
+from ml_reco_simple_api import bp_reco_simple
+from ml_delay_api import bp_delay
+from ml_anomaly_api import bp_anom
+from kpi_api import bp_kpi 
 
 
 # ----------------------------------------------------------------------------
 # Configuration
 # ----------------------------------------------------------------------------
 DB_USER = os.getenv("DB_USER", "postgres")
-DB_PASS = os.getenv("DB_PASS", "kdh")
+DB_PASS = os.getenv("DB_PASS", "313055")
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_NAME", "logiops")
@@ -32,7 +36,7 @@ DATABASE_URL = (
 )
 
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change-me-in-prod")
-CORS_ORIGIN = os.getenv("CORS_ORIGIN", "http://10.188.54.232:8080")
+CORS_ORIGIN = os.getenv("CORS_ORIGIN", "http://localhost:8080")
 
 
 # ----------------------------------------------------------------------------
@@ -42,12 +46,38 @@ app = Flask(__name__)
 app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=12)
 
-CORS(app, resources={r"/api/*": {"origins": CORS_ORIGIN}})
+# CORS (autorise localhost ET 127.0.0.1 + header Authorization)
+CORS(
+    app,
+    resources={r"/api/*": {
+        "origins": ["http://localhost:8080", "http://127.0.0.1:8080", CORS_ORIGIN]
+    }},
+    supports_credentials=False,
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+)
+
 
 jwt = JWTManager(app)
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 SessionLocal = scoped_session(sessionmaker(bind=engine, autoflush=False, autocommit=False))
+
+
+
+
+#Register-------------------
+app.config["_ENGINE"] = engine
+app.register_blueprint(bp_eta)
+app.register_blueprint(bp_reco_simple)
+app.register_blueprint(bp_delay)
+app.register_blueprint(bp_anom)
+app.register_blueprint(bp_kpi)
+
+
+#-----------------------
+
+
 
 
 # ----------------------------------------------------------------------------
@@ -227,5 +257,6 @@ def init_db() -> None:
 
 
 if __name__ == "__main__":
-    init_db()  # Initialisation DB avant de lancer Flask
+    init_db()
     app.run(host="127.0.0.1", port=8000, debug=True)
+
