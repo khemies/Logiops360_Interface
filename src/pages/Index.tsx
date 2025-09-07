@@ -2,9 +2,9 @@ import { useState } from "react";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { Navbar } from "@/components/layout/Navbar";
 import { SupervisorDashboard } from "@/components/dashboard/SupervisorDashboard";
-import { CommandesDashboard } from "@/components/dashboard/CommandesDashboard";
 import { StockageDashboard } from "@/components/dashboard/StockageDashboard";
 import { TransportDashboard } from "@/components/dashboard/TransportDashboard";
+import  CommandesDashboard  from "@/components/dashboard/CommandesDashboard";
 
 const Index = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
