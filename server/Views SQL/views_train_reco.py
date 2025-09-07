@@ -1,10 +1,11 @@
 # create_view_reco.py
 from sqlalchemy import create_engine, text
-import os, sys
+import os
+import sys
 
 # Connexion DB (tes valeurs par défaut)
 PG_USER = os.getenv("PG_USER", "postgres")
-PG_PASSWORD = os.getenv("PG_PASSWORD", "313055")
+PG_PASSWORD = os.getenv("PG_PASSWORD", "kdh")
 PG_HOST = os.getenv("PG_HOST", "localhost")
 PG_PORT = os.getenv("PG_PORT", "5432")
 PG_DATABASE = os.getenv("PG_DATABASE", "logiops")
@@ -112,6 +113,7 @@ FROM shipments s
 JOIN carrier_profiles cp ON TRUE;
 """
 
+
 def main():
     try:
         with engine.connect() as conn:
@@ -130,6 +132,7 @@ def main():
     except Exception as e:
         print("Erreur lors de la création des vues :", e, file=sys.stderr)
         raise
+
 
 if __name__ == "__main__":
     main()

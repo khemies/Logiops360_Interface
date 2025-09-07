@@ -3,7 +3,7 @@ import os
 
 # ---- Connexion DB (mêmes valeurs que précédemment, adaptables par variables d'env) ----
 PG_USER = os.getenv("PG_USER", "postgres")
-PG_PASSWORD = os.getenv("PG_PASSWORD", "313055")
+PG_PASSWORD = os.getenv("PG_PASSWORD", "kdh")
 PG_HOST = os.getenv("PG_HOST", "localhost")
 PG_PORT = os.getenv("PG_PORT", "5432")
 PG_DATABASE = os.getenv("PG_DATABASE", "logiops")
@@ -41,6 +41,7 @@ WHERE target_eta_hours IS NOT NULL
   AND sla_hours IS NOT NULL;
 """
 
+
 def main():
     with engine.connect() as conn:
         conn.execute(text(sql))
@@ -48,6 +49,7 @@ def main():
         print("Vue fv_train_delay créée avec succès.")
         count = conn.execute(text("SELECT COUNT(*) FROM fv_train_delay")).scalar()
         print(f"Lignes prêtes pour l'entraînement: {count}")
+
 
 if __name__ == "__main__":
     main()

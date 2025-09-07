@@ -21,7 +21,7 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 def _get_engine():
     # mêmes variables d’env que le backend
     DB_USER = os.getenv("DB_USER", "postgres")
-    DB_PASS = os.getenv("DB_PASS", "mel")
+    DB_PASS = os.getenv("DB_PASS", "kdh")
     DB_HOST = os.getenv("DB_HOST", "localhost")
     DB_PORT = int(os.getenv("DB_PORT", "5432"))
     DB_NAME = os.getenv("DB_NAME", "logiops")

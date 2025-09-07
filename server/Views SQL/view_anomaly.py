@@ -1,9 +1,10 @@
 from sqlalchemy import create_engine, text
-import os, sys
+import os
+import sys
 
 # --- Connexion DB ---
 PG_USER = os.getenv("PG_USER", "postgres")
-PG_PASSWORD = os.getenv("PG_PASSWORD", "313055")
+PG_PASSWORD = os.getenv("PG_PASSWORD", "kdh")
 PG_HOST = os.getenv("PG_HOST", "localhost")
 PG_PORT = os.getenv("PG_PORT", "5432")
 PG_DATABASE = os.getenv("PG_DATABASE", "logiops")
@@ -13,20 +14,20 @@ engine = create_engine(
 )
 
 SQL_STATEMENTS = [
-# 0) DROP dans l'ordre inverse des dépendances
-"""
+    # 0) DROP dans l'ordre inverse des dépendances
+    """
 DROP VIEW IF EXISTS fv_phase_enriched;
 """,
-"""
+    """
 DROP VIEW IF EXISTS fv_phase_stats;
 """,
-"""
+    """
 DROP VIEW IF EXISTS fv_phase_durations;
 """,
 
-# 1) Durées brutes : on NE filtre PAS 'delivered' ici
-#    -> ainsi la phase N-1 a comme durée le delta jusqu'à delivered
-"""
+    # 1) Durées brutes : on NE filtre PAS 'delivered' ici
+    #    -> ainsi la phase N-1 a comme durée le delta jusqu'à delivered
+    """
 CREATE OR REPLACE VIEW fv_phase_durations AS
 WITH raw AS (
   SELECT
@@ -51,8 +52,8 @@ SELECT
 FROM raw;
 """,
 
-# 2) Stats par (carrier, phase_norm) en EXCLUANT delivered, et en ignorant les NULL
-"""
+    # 2) Stats par (carrier, phase_norm) en EXCLUANT delivered, et en ignorant les NULL
+    """
 CREATE OR REPLACE VIEW fv_phase_stats AS
 SELECT
   s.carrier,
@@ -69,8 +70,8 @@ WHERE d.duration_h IS NOT NULL
 GROUP BY s.carrier, d.phase_norm;
 """,
 
-# 3) Évènements enrichis (sans delivered) + règle P90
-"""
+    # 3) Évènements enrichis (sans delivered) + règle P90
+    """
 CREATE OR REPLACE VIEW fv_phase_enriched AS
 SELECT
   d.shipment_id,
@@ -96,6 +97,7 @@ WHERE d.duration_h IS NOT NULL;
 """
 ]
 
+
 def main():
     try:
         with engine.begin() as conn:
@@ -120,6 +122,7 @@ def main():
         print("Échec lors de la création des vues :", e, file=sys.stderr)
         # le raise te donnera le message précis de Postgres/SQLAlchemy
         raise
+
 
 if __name__ == "__main__":
     main()

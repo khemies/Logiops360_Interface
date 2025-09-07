@@ -2,7 +2,7 @@ from sqlalchemy import create_engine, text
 
 # Variables de connexion
 PG_USER = "postgres"
-PG_PASSWORD = "313055"
+PG_PASSWORD = "kdh"
 PG_HOST = "localhost"
 PG_PORT = "5432"
 PG_DATABASE = "logiops"
@@ -42,6 +42,7 @@ LEFT JOIN carrier_profiles cp
 WHERE s.delivery_datetime IS NOT NULL;
 """
 
+
 def main():
     with engine.connect() as conn:
         conn.execute(text(sql))
@@ -52,6 +53,7 @@ def main():
         result = conn.execute(text("SELECT COUNT(*) FROM fv_train_eta;"))
         count = result.scalar()
         print(f"Nombre de lignes dans fv_train_eta : {count}")
+
 
 if __name__ == "__main__":
     main()
