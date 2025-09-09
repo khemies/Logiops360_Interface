@@ -120,7 +120,7 @@ export const StockageDashboard = () => {
   );
 
   const [optimisations, setOptimisations] = useState(
-    [] as { type: string; description: string; economie: string; priorite: "critique" | "haute" | "moyenne" }[]
+    [] as { type: string; description: string; priorite: "critique" | "haute" | "moyenne" }[]
   );
 
   const [emplacementsCritiques, setEmplacementsCritiques] = useState(
@@ -131,6 +131,9 @@ export const StockageDashboard = () => {
 
   const [selectedLoc, setSelectedLoc] = useState<string | null>(null);
   const [locDetails, setLocDetails] = useState<LocationDetail | null>(null);
+
+  // ====== AJOUT : on conserve la réponse slotting pour afficher le Top 5 IN/OUT ======
+  const [slotting, setSlotting] = useState<SlottingResponse | null>(null);
 
   const fetchKpis = async (): Promise<StorageKpis> => {
     const r = await fetch(`${API}/storage/kpis?t=${Date.now()}`, { cache: "no-store" as RequestCache });
@@ -172,11 +175,14 @@ export const StockageDashboard = () => {
     try {
       setLoading(true);
       const [slot, hs] = await Promise.all([fetchSlotting(), fetchHotspots()]);
+
+      // AJOUT : garder slotting à jour pour le Top 5
+      setSlotting(slot);
+
       const nbRupture = (hs.items || []).filter((i) => (i.reason || "").toLowerCase().includes("rupture")).length;
       const opt = [
-        { type: "Slotting", description: `Repositionner ${slot.summary.moves} produits`, economie: "—", priorite: (slot.summary.moves || 0) > 0 ? "haute" : "moyenne" } as const,
-        { type: "Réassort", description: `${nbRupture} références en rupture prévue`, economie: "—", priorite: nbRupture > 0 ? "critique" : "moyenne" } as const,
-        { type: "Clustering", description: "Regrouper produits complémentaires", economie: "—", priorite: "moyenne" } as const,
+        { type: "Slotting", description: `Repositionner ${slot.summary.moves} produits`, priorite: (slot.summary.moves || 0) > 0 ? "haute" : "moyenne" } as const,
+        { type: "Réassort", description: `${nbRupture} références en rupture prévue`,  priorite: nbRupture > 0 ? "critique" : "moyenne" } as const,
       ];
       setOptimisations(opt);
     } catch (e: any) {
@@ -200,7 +206,6 @@ export const StockageDashboard = () => {
       ];
       setStockageStats(stats);
 
-
       const zonesUi = (z.items || []).map((it) => {
         const meta = zoneMeta(it.zone);
         return {
@@ -223,11 +228,13 @@ export const StockageDashboard = () => {
 
       const nbRupture = (hs.items || []).filter((i) => (i.reason || "").toLowerCase().includes("rupture")).length;
       const opt = [
-        { type: "Slotting", description: `Repositionner ${slot.summary.moves} produits`, economie: "—", priorite: (slot.summary.moves || 0) > 0 ? "haute" : "moyenne" } as const,
-        { type: "Réassort", description: `${nbRupture} références en rupture prévue`, economie: "—", priorite: nbRupture > 0 ? "critique" : "moyenne" } as const,
-        { type: "Clustering", description: "Regrouper produits complémentaires", economie: "—", priorite: "moyenne" } as const,
+        { type: "Slotting", description: `Repositionner ${slot.summary.moves} produits`, priorite: (slot.summary.moves || 0) > 0 ? "haute" : "moyenne" } as const,
+        { type: "Réassort", description: `${nbRupture} références en rupture prévue`,  priorite: nbRupture > 0 ? "critique" : "moyenne" } as const,
       ];
       setOptimisations(opt);
+
+      // AJOUT : conserver la réponse slotting
+      setSlotting(slot);
 
       setMapItems(map.items || []);
     } catch (e: any) {
@@ -323,6 +330,38 @@ export const StockageDashboard = () => {
     return { viewBox: `0 0 ${Wg} ${Hg}`, width: "100%", height: Math.min(280, Hg), points };
   }, [mapItems]);
 
+  // ====== AJOUT : calcul Top 5 IN/OUT à partir de slotting.sample ======
+  const top5IN = useMemo(() => {
+    if (!slotting || !Array.isArray(slotting.sample)) return [] as { ref: string; qty: number }[];
+    // On agrège par référence au cas où plusieurs mouvements existent pour la même ref
+    const agg: Record<string, number> = {};
+    for (const s of slotting.sample) {
+      if ((s.to_zone || "").toUpperCase() === "A") {
+        const key = s.referenceproduit || "?";
+        agg[key] = (agg[key] || 0) + (s.move_qty || 0);
+      }
+    }
+    return Object.entries(agg)
+      .map(([ref, qty]) => ({ ref, qty }))
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5);
+  }, [slotting]);
+
+  const top5OUT = useMemo(() => {
+    if (!slotting || !Array.isArray(slotting.sample)) return [] as { ref: string; qty: number }[];
+    const agg: Record<string, number> = {};
+    for (const s of slotting.sample) {
+      if ((s.from_zone || "").toUpperCase() === "A") {
+        const key = s.referenceproduit || "?";
+        agg[key] = (agg[key] || 0) + (s.move_qty || 0);
+      }
+    }
+    return Object.entries(agg)
+      .map(([ref, qty]) => ({ ref, qty }))
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5);
+  }, [slotting]);
+
   return (
     <div className="space-y-6 p-6">
       {/* En-tête */}
@@ -407,7 +446,7 @@ export const StockageDashboard = () => {
               <TrendingUp className="h-5 w-5" />
               <span>Optimisations IA</span>
             </CardTitle>
-            <CardDescription>Recommandations KMeans + heuristiques</CardDescription>
+            <CardDescription>Recommandations</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {optimisations.map((opt, index) => (
@@ -422,9 +461,8 @@ export const StockageDashboard = () => {
                   </Badge>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-success">Économie: {opt.economie}</span>
                   <Button size="sm" variant="outline" onClick={handleOptimize} disabled={loading}>
-                    Appliquer
+                    Voir
                   </Button>
                 </div>
               </div>
@@ -477,11 +515,52 @@ export const StockageDashboard = () => {
         </CardContent>
       </Card>
 
+      {/* ====== AJOUT : Top 5 IN/OUT ====== */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Top 5 Produits IN / OUT</CardTitle>
+          <CardDescription>Flux des mouvements vers et depuis la fast zone (A)</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-semibold mb-2 text-green-600">Top 5 IN</h4>
+              {top5IN.length > 0 ? (
+                <ul className="space-y-1">
+                  {top5IN.map((p, i) => (
+                    <li key={i} className="flex justify-between">
+                      <span>{p.ref}</span>
+                      <span className="font-medium">{p.qty}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">Aucun mouvement IN</p>
+              )}
+            </div>
+            <div>
+              <h4 className="font-semibold mb-2 text-red-600">Top 5 OUT</h4>
+              {top5OUT.length > 0 ? (
+                <ul className="space-y-1">
+                  {top5OUT.map((p, i) => (
+                    <li key={i} className="flex justify-between">
+                      <span>{p.ref}</span>
+                      <span className="font-medium">{p.qty}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">Aucun mouvement OUT</p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Schéma de l'entrepôt */}
       <Card>
         <CardHeader>
           <CardTitle>Plan de l'entrepôt</CardTitle>
-          <CardDescription>Visualisation interactive des zones et emplacements</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-64 flex items-center justify-center text-muted-foreground border-2 border-dashed rounded-lg">
