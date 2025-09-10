@@ -8,6 +8,9 @@ import sys
 import subprocess
 import pandas as pd
 from datetime import datetime
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
 
 from flask import Blueprint, jsonify, make_response, request
 from sqlalchemy import create_engine, text
@@ -396,50 +399,40 @@ def operators_load_status():
 @bp.post("/orders/upload")
 def upload_and_retrain():
     """
-    1) Reçoit un CSV, garde la colonne de dates -> creationdate, insère dans clean_customer_orders.
-    2) Lance TON script de training: models/prevision_model.py
-       (tentative 1: -m models.prevision_model ; tentative 2: chemin fichier)
-    3) Renvoie toujours un JSON explicite (pas d'erreur réseau générique).
+    1) Reçoit un CSV (form-data).
+    2) Ajoute les données dans la table clean_customer_orders.
+    3) Lance le script d'entraînement prevision_model.py.
+    4) Retourne un message de succès.
     """
-    import io, sys
+    import io, sys, subprocess
 
-    # ---------- 1) Fichier ----------
+    # --- 1) Vérifier et lire le CSV ---
     if "file" not in request.files:
-        return _json_no_cache({"error": "file is required"}, 400)
+        current_app.logger.error(f"[upload_and_retrain] Erreur entraînement CSV manquant: {e}")
+        return _json_no_cache({
+        "error": f"Lancement entraînement échoué : {e}",
+        "BASE_DIR": str(BASE_DIR)
+    }, 500)
+
 
     f = request.files["file"]
     raw = f.read()
     if not raw:
-        return _json_no_cache({"error": "empty file"}, 400)
+        return _json_no_cache({"error": "CSV vide"}, 400)
 
-    # Lecture CSV tolérante (, / ;)
     try:
-        try:
-            df = pd.read_csv(io.BytesIO(raw))
-        except Exception:
-            df = pd.read_csv(io.BytesIO(raw), sep=";")
+        df = pd.read_csv(io.BytesIO(raw))
     except Exception as e:
-        return _json_no_cache({"error": f"cannot read CSV: {e}"}, 400)
+        current_app.logger.error(f"[upload_and_retrain] Erreur entraînement CSV manquant: {e}")
+        return _json_no_cache({
+        "error": f"Lancement entraînement échoué : {e}",
+        "BASE_DIR": str(BASE_DIR)
+    }, 400)
 
     if df.empty:
-        return _json_no_cache({"error": "CSV is empty"}, 400)
+        return _json_no_cache({"error": "CSV sans données"}, 400)
 
-    # Colonne date -> creationdate
-    date_col = _find_col(df.columns, ("creationdate","date","day","jour","ts","ds"))
-    if not date_col:
-        return _json_no_cache({"error": "CSV must contain a date column (creationdate|date|day|ts|ds)"}, 400)
-
-    try:
-        df = df[[date_col]].copy()
-        df["creationdate"] = pd.to_datetime(df[date_col], errors="coerce")
-        df = df[df["creationdate"].notna()][["creationdate"]]
-        if df.empty:
-            return _json_no_cache({"error": "no valid timestamps found in CSV"}, 400)
-    except Exception as e:
-        return _json_no_cache({"error": f"date parsing failed: {e}"}, 400)
-
-    # ---------- 2) Insert DB ----------
-    rows = int(len(df))
+    # --- 2) Insérer dans la base ---
     try:
         eng = get_engine()
         with eng.begin() as cn:
@@ -450,52 +443,40 @@ def upload_and_retrain():
             """))
             df.to_sql("clean_customer_orders", cn, if_exists="append", index=False)
     except Exception as e:
-        return _json_no_cache({"error": f"DB append failed: {e}"}, 500)
+        current_app.logger.error(f"[upload_and_retrain] Erreur entraînement: {e}")
+        return _json_no_cache({
+        "error": f"Lancement entraînement échoué : {e}",
+        "BASE_DIR": str(BASE_DIR)
+    }, 500)
 
-    # ---------- 3) Lance TON script de training ----------
-        # ---------- 3) Lance TON script de training ----------
-    out = "training skipped"
+    # --- 3) Lancer le script d'entraînement ---
     try:
-        env = os.environ.copy()
-        # Assure qu'on importe bien depuis 'server'
-        env["PYTHONPATH"] = str(BASE_DIR) + os.pathsep + env.get("PYTHONPATH", "")
-        env["PYTHONFAULTHANDLER"] = "1"  # stack trace détaillée
-
-        script_path = (BASE_DIR / "models" / "prevision_model.py").resolve()
-        if not script_path.exists():
-            return _json_no_cache({
-                "error": "training failed: prevision_model.py introuvable",
-                "details": str(script_path)
-            }, 500)
+        BASE_DIR = Path(__file__).resolve().parent.parent  # ou parent.parent si tu veux
+        script_path = BASE_DIR / "models" / "prevision_model.py"
 
         cmd = [sys.executable, str(script_path)]
-        p = subprocess.run(
-            cmd, cwd=BASE_DIR, capture_output=True, text=True, timeout=600, env=env
-        )
+        p = subprocess.run(cmd, cwd=BASE_DIR, capture_output=True, text=True, timeout=600)
+
         if p.returncode != 0:
+            current_app.logger.error(f"[upload_and_retrain] Erreur entraînement CSV manquant: {e}")
             return _json_no_cache({
-                "error": "training failed",
-                "details": (p.stderr or p.stdout or "").strip(),
-                "cmd": " ".join(cmd),
-                "script_path": str(script_path),
-            }, 500)
+            "error": f"Lancement entraînement échoué : {e}",
+            "BASE_DIR": str(BASE_DIR)
+        }, 500)
 
-        out = (p.stdout or "ok").strip()
-
-    except subprocess.TimeoutExpired:
-        return _json_no_cache({"error": "training timeout (600s)"}, 500)
     except Exception as e:
-        return _json_no_cache({"error": f"training failed: {e}"}, 500)
+        current_app.logger.error(f"[upload_and_retrain] Erreur entraînement CSV manquant: {e}")
+        return _json_no_cache({
+        "error": f"Lancement entraînement échoué : {e}",
+        "BASE_DIR": str(BASE_DIR)
+    }, 500)
 
-
-
-    # ---------- 4) OK ----------
+    # --- 4) Succès ---
+    current_app.logger.info("[upload_and_retrain] Succès, retour JSON")
     return _json_no_cache({
-        "status": "ok",
-        "rows_appended": rows,
-        "message": "CSV intégré et modèle réentraîné",
-        "output": out
-    }, 200)
+    "status": "ok",
+    "message": "Modèle réentraîné avec succès"
+}, 200)
 
 @bp.get("/_debug/forecast_files")
 def _debug_forecast_files():

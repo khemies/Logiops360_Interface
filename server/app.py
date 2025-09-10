@@ -81,7 +81,11 @@ app.register_blueprint(bp_anom)
 app.register_blueprint(bp_kpi)
 app.register_blueprint(bp_orders_forecast)
 app.register_blueprint(bp_storage)
-
+print("\n=== ROUTES DISPONIBLES ===")
+for rule in app.url_map.iter_rules():
+    methods = ",".join(sorted(rule.methods))
+    print(f"{rule.endpoint:30s} {methods:20s} {rule.rule}")
+print("====================================\n")
 # ----------------------------------------------------------------------------
 # Helpers
 # ----------------------------------------------------------------------------
