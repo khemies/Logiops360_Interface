@@ -27,8 +27,6 @@ from ml_orders_forecast_api import bp_orders_forecast
 from storage_api import bp as bp_storage
 
 
-
-
 # ----------------------------------------------------------------------------
 # Configuration
 # ----------------------------------------------------------------------------
@@ -60,9 +58,10 @@ CORS(
             "origins": ["http://localhost:8080", "http://127.0.0.1:8080", CORS_ORIGIN]
         }
     },
-    supports_credentials=False,
+    supports_credentials=True,
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_headers=["Content-Type", "Authorization","Cache-Control"],
+    expose_headers=["Content-Type", "Authorization"]
 )
 
 jwt = JWTManager(app)
@@ -91,6 +90,7 @@ print("====================================\n")
 # ----------------------------------------------------------------------------
 ALLOWED_PROFILES = {p.value for p in TypeProfil}
 
+
 def validate_profile(value: str) -> str:
     v = (value or "").strip().lower()
     if v not in ALLOWED_PROFILES:
@@ -102,6 +102,8 @@ def validate_profile(value: str) -> str:
 # ----------------------------------------------------------------------------
 # Routes
 # ----------------------------------------------------------------------------
+
+
 @app.get("/api/health")
 def health():
     try:
@@ -110,6 +112,104 @@ def health():
         return jsonify(status="ok"), 200
     except Exception as e:
         return jsonify(status="error", error=str(e)), 500
+
+@app.get("/api/supervisor/charts")
+def supervisor_charts():
+    """Récupère les données pour les graphiques du dashboard superviseur"""
+    try:
+        with engine.connect() as conn:
+            # Graphe 1 : Top 10 points de stockage par volume
+            top_storage_sql = """
+                SELECT l.label, SUM(sl.volume) as total_volume
+                FROM public.clean_support_points l
+                JOIN public.clean_storage_location sl
+                  ON l.label = sl.support_label
+                GROUP BY l.label
+                ORDER BY total_volume DESC
+                LIMIT 10
+            """
+            top_storage = [dict(row._mapping) for row in conn.execute(text(top_storage_sql)).fetchall()]
+
+            # Graphe 2 : Vue des stocks (quantité totale) sans valeurs à zéro
+            stock_view_sql = """
+                SELECT referenceproduit,
+                       (qty_class_based + qty_dedicated + qty_random) as total_qty
+                FROM public.unified_storage_view
+                WHERE (qty_class_based + qty_dedicated + qty_random) > 0
+                ORDER BY total_qty DESC
+            """
+            stock_view = [dict(row._mapping) for row in conn.execute(text(stock_view_sql)).fetchall()]
+
+            # Données des commandes par jour (derniers 7 jours)
+            orders_trend_sql = """
+                SELECT 
+                    DATE(creationdate) as date,
+                    COUNT(*) as orders_count,
+                    COUNT(DISTINCT operator) as operators_count
+                FROM clean_customer_orders 
+                WHERE creationdate >= CURRENT_DATE - INTERVAL '7 days'
+                GROUP BY DATE(creationdate)
+                ORDER BY date
+            """
+            orders_trend = [dict(row._mapping) for row in conn.execute(text(orders_trend_sql)).fetchall()]
+
+            # Répartition par client
+            customer_orders_sql = """
+                SELECT 
+                    codcustomer,
+                    COUNT(*) as orders_count,
+                    SUM(quantity_units) as total_quantity
+                FROM clean_customer_orders
+                WHERE DATE_TRUNC('year', creationdate) = DATE_TRUNC('year', CURRENT_DATE)
+                GROUP BY codcustomer
+                ORDER BY orders_count DESC
+                LIMIT 10
+            
+            """
+            customer_orders = [dict(row._mapping) for row in conn.execute(text(customer_orders_sql)).fetchall()]
+
+            # Volume par taille
+            size_distribution_sql = """
+                SELECT 
+                    size_us,
+                    COUNT(*) as orders_count,
+                    SUM(quantity_units) as total_quantity
+                FROM clean_customer_orders 
+                WHERE DATE(creationdate) = CURRENT_DATE
+                AND size_us IS NOT NULL
+                GROUP BY size_us
+                ORDER BY orders_count DESC
+            """
+            size_distribution = [dict(row._mapping) for row in conn.execute(text(size_distribution_sql)).fetchall()]
+
+            # Performance par opérateur
+            operator_performance_sql = """
+                SELECT 
+                    operator,
+                    COUNT(*) as orders_processed,
+                    SUM(quantity_units) as total_units,
+                    COUNT(DISTINCT wavenumber) as waves_handled
+                FROM clean_customer_orders 
+                WHERE DATE(creationdate) = CURRENT_DATE
+                AND operator IS NOT NULL
+                GROUP BY operator
+                ORDER BY orders_processed DESC
+                LIMIT 15
+            """
+            operator_performance = [dict(row._mapping)
+                                    for row in conn.execute(text(operator_performance_sql)).fetchall()]
+
+            return jsonify(
+                orders_trend=orders_trend,
+                customer_orders=customer_orders,
+                size_distribution=size_distribution,
+                operator_performance=operator_performance,
+                top_storage=top_storage,
+                stock_view=stock_view
+            ), 200
+
+    except Exception as e:
+        return jsonify(error=str(e)), 500
 
 @app.post("/api/auth/signup")
 def signup():
@@ -177,6 +277,7 @@ def signup():
     finally:
         session.close()
 
+
 @app.post("/api/auth/login")
 def login():
     data = request.get_json(force=True) or {}
@@ -226,6 +327,7 @@ def login():
     finally:
         session.close()
 
+
 @app.get("/api/auth/me")
 @jwt_required()
 def me():
@@ -251,9 +353,12 @@ def me():
 # ----------------------------------------------------------------------------
 # Main
 # ----------------------------------------------------------------------------
+
+
 def init_db() -> None:
     """Créer les tables si elles n'existent pas encore."""
     Base.metadata.create_all(bind=engine)
+
 
 if __name__ == "__main__":
     init_db()

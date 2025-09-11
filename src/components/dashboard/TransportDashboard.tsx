@@ -44,7 +44,7 @@ export const TransportDashboard = () => {
         <DelayRiskCard token={token} />
 
         {/* Colonne droite : Recommandation + ETA */}
-        <div className="flex flex-col gap-6">
+        <div id="prediction-eta" className="flex flex-col gap-6">
           <CarrierSimpleCard token={token} />
           <EtaPredictCard token={token} />
         </div>

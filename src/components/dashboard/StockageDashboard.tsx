@@ -135,6 +135,12 @@ export const StockageDashboard = () => {
   // ====== AJOUT : on conserve la réponse slotting pour afficher le Top 5 IN/OUT ======
   const [slotting, setSlotting] = useState<SlottingResponse | null>(null);
 
+  // ====== AJOUT : scroll doux vers la section Top 5 ======
+  const scrollToTop5 = () => {
+    const el = document.getElementById("top5-produits-in-out");
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const fetchKpis = async (): Promise<StorageKpis> => {
     const r = await fetch(`${API}/storage/kpis?t=${Date.now()}`, { cache: "no-store" as RequestCache });
     const j = await r.json();
@@ -333,7 +339,6 @@ export const StockageDashboard = () => {
   // ====== AJOUT : calcul Top 5 IN/OUT à partir de slotting.sample ======
   const top5IN = useMemo(() => {
     if (!slotting || !Array.isArray(slotting.sample)) return [] as { ref: string; qty: number }[];
-    // On agrège par référence au cas où plusieurs mouvements existent pour la même ref
     const agg: Record<string, number> = {};
     for (const s of slotting.sample) {
       if ((s.to_zone || "").toUpperCase() === "A") {
@@ -461,9 +466,16 @@ export const StockageDashboard = () => {
                   </Badge>
                 </div>
                 <div className="flex justify-between items-center">
-                  <Button size="sm" variant="outline" onClick={handleOptimize} disabled={loading}>
-                    Voir
-                  </Button>
+                  {/* MODIF : sur "Slotting", scroller vers Top 5 ; sinon, on laisse le bouton basique */}
+                  {opt.type === "Slotting" ? (
+                    <Button size="sm" variant="outline" onClick={scrollToTop5}>
+                      Voir
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={handleOptimize} disabled={loading}>
+                      Voir
+                    </Button>
+                  )}
                 </div>
               </div>
             ))}
@@ -515,8 +527,8 @@ export const StockageDashboard = () => {
         </CardContent>
       </Card>
 
-      {/* ====== AJOUT : Top 5 IN/OUT ====== */}
-      <Card>
+      {/* ====== Top 5 IN/OUT (CIBLE DU SCROLL) ====== */}
+      <Card id="top5-produits-in-out">
         <CardHeader>
           <CardTitle>Top 5 Produits IN / OUT</CardTitle>
           <CardDescription>Flux des mouvements vers et depuis la fast zone (A)</CardDescription>
