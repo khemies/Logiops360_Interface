@@ -68,6 +68,22 @@ async function safeJsonGet(url: string, withAuth = false): Promise<any | null> {
   }
 }
 
+/** ===== Formatage dates pour l’axe/tooltip ===== */
+function fmtDayShort(v: any) {
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return String(v);
+  // ex: "11 sept"
+  return d
+    .toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })
+    .replace(".", "");
+}
+function fmtDayLong(v: any) {
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return String(v);
+  // ex: "11 septembre 2025"
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+}
+
 /* ================= Component ================= */
 const SupervisorDashboard = ({ onNavigate }: Props) => {
   // KPI top
@@ -360,9 +376,20 @@ const SupervisorDashboard = ({ onNavigate }: Props) => {
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={charts?.orders_trend || []}>
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" />
+                  {/* ✅ Formatage des dates */}
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={fmtDayShort}
+                    interval={0}
+                    angle={-20}
+                    textAnchor="end"
+                    height={40}
+                  />
                   <YAxis />
-                  <Tooltip />
+                  <Tooltip
+                    labelFormatter={fmtDayLong}
+                    formatter={(val: any, name: any) => [val, name === "orders_count" ? "Commandes" : name]}
+                  />
                   <Bar dataKey="orders_count" fill="hsl(var(--primary))" />
                 </BarChart>
               </ResponsiveContainer>

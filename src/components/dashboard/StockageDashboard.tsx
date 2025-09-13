@@ -29,6 +29,7 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
+  LabelList, // 
 } from "recharts";
 
 const API = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
@@ -98,6 +99,11 @@ type StorageAnalyticsResponse = { class_distribution: ClassDistributionItem[]; t
 
 const fmtInt = (n?: number) => (typeof n === "number" ? n.toLocaleString("fr-FR") : "—");
 const fmtPct = (x?: number) => typeof x === "number" && isFinite(x) ? `${Math.round(x * 100).toLocaleString("fr-FR")}%` : "—";
+
+/* ⬇️ Helpers pour l’affichage des grands nombres sur les axes */
+const fmtCompact = (n: number) =>
+  new Intl.NumberFormat("fr-FR", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+const fmtFull = (n: number) => new Intl.NumberFormat("fr-FR").format(n);
 
 const zoneMeta = (z: string) => {
   const code = (z || "?").toUpperCase();
@@ -264,7 +270,6 @@ export const StockageDashboard = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-primary">Gestion du Stockage</h1>
-          <p className="text-muted-foreground">Optimisation de l'entrepôt et slotting intelligent</p>
         </div>
         <Button size="sm" onClick={handleOptimize} disabled={loading}>Optimiser slotting</Button>
       </div>
@@ -310,86 +315,137 @@ export const StockageDashboard = () => {
             <CardDescription>Slotting, IN/OUT & analytics</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-          {/* Top 5 IN/OUT */}
-<div>
-  <h4 className="font-semibold">Top 5 Produits IN / OUT</h4>
-  <div className="grid grid-cols-2 gap-6">
-    {/* IN */}
-    <div>
-      <h5 className="text-green-600 font-medium">IN</h5>
-      <ul>
-        {top5IN.map((p, i) => (
-          <li key={i} className="flex justify-between">
-            <span>{p.ref}</span>
-            <span className="font-medium">{p.qty}</span>
-          </li>
-        ))}
-        {/* 🔹 Données fixes ajoutées sous le IN */}
-        {[
-          { ref: "8BSFSA", qty: 115 },
-          { ref: "BLJLMQ", qty: 123 },
-          { ref: "U8203G", qty: 100 },
-          { ref: "ZX6MUV", qty: 112 },
-          { ref: "0SJH1Z", qty: 188 },
-        ].map((p, i) => (
-          <li key={`fixed-${i}`} className="flex justify-between text-muted-foreground">
-            <span>{p.ref}</span>
-            <span className="font-medium">{p.qty}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
+            {/* Top 5 IN/OUT */}
+            <div>
+              <h4 className="font-semibold">Top 5 Produits IN / OUT</h4>
+              <div className="grid grid-cols-2 gap-6">
+                {/* IN */}
+                <div>
+                  <h5 className="text-green-600 font-medium">IN</h5>
+                  <ul>
+                    {top5IN.map((p, i) => (
+                      <li key={i} className="flex justify-between">
+                        <span>{p.ref}</span>
+                        <span className="font-medium">{p.qty}</span>
+                      </li>
+                    ))}
+                    {/* Données fixes ajoutées sous le IN */}
+                    {[
+                      { ref: "8BSFSA", qty: 115 },
+                      { ref: "BLJLMQ", qty: 123 },
+                      { ref: "U8203G", qty: 100 },
+                      { ref: "ZX6MUV", qty: 112 },
+                      { ref: "0SJH1Z", qty: 188 },
+                    ].map((p, i) => (
+                      <li key={`fixed-${i}`} className="flex justify-between text-muted-foreground">
+                        <span>{p.ref}</span>
+                        <span className="font-medium">{p.qty}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
 
-    {/* OUT */}
-    <div>
-      <h5 className="text-red-600 font-medium">OUT</h5>
-      <ul>
-        {top5OUT.length > 0 ? (
-          top5OUT.map((p, i) => (
-            <li key={i} className="flex justify-between">
-              <span>{p.ref}</span>
-              <span className="font-medium">{p.qty}</span>
-            </li>
-          ))
-        ) : (
-          <p className="text-sm text-muted-foreground">Aucun mouvement OUT</p>
-        )}
-      </ul>
-    </div>
-  </div>
-</div>
+                {/* OUT */}
+                <div>
+                  <h5 className="text-red-600 font-medium">OUT</h5>
+                  <ul>
+                    {top5OUT.length > 0 ? (
+                      top5OUT.map((p, i) => (
+                        <li key={i} className="flex justify-between">
+                          <span>{p.ref}</span>
+                          <span className="font-medium">{p.qty}</span>
+                        </li>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Aucun mouvement OUT</p>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </div>
 
             {/* Graphe 1 : Répartition produits par classe */}
-<div className="mt-32 h-64">
-  <ResponsiveContainer width="100%" height="100%">
-    <ComposedChart data={analytics?.class_distribution || []}>
-      <CartesianGrid strokeDasharray="3 3" />
-      <XAxis dataKey="class" />
-      <YAxis yAxisId="left" />
-      <YAxis yAxisId="right" orientation="right" />
-      <Tooltip />
-      <Bar yAxisId="left" dataKey="nb_products" fill="hsl(var(--primary))" />
-      <Line
-        yAxisId="right"
-        type="monotone"
-        dataKey="total_qty"
-        stroke="hsl(var(--secondary))"
-        strokeWidth={2}
-      />
-    </ComposedChart>
-  </ResponsiveContainer>
-</div>
-
+            <div className="mt-32 h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart
+                  data={analytics?.class_distribution || []}
+                  margin={{ top: 16, right: 12, bottom: 8, left: 12 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="class" />
+                  <YAxis
+                    yAxisId="left"
+                    width={70}
+                    tickFormatter={(v) => fmtCompact(Number(v))}
+                    allowDecimals={false}
+                  />
+                  <YAxis
+                    yAxisId="right"
+                    orientation="right"
+                    width={70}
+                    tickFormatter={(v) => fmtCompact(Number(v))}
+                    allowDecimals={false}
+                  />
+                  <Tooltip
+                    formatter={(val: any, name) =>
+                      [fmtFull(Number(val)), name === "nb_products" ? "Nb produits" : "Qté totale"]
+                    }
+                  />
+                  <Bar yAxisId="left" dataKey="nb_products" fill="hsl(var(--primary))">
+                    <LabelList
+                      dataKey="nb_products"
+                      position="top"
+                      formatter={(v: any) => fmtCompact(Number(v))}
+                      className="text-[10px]"
+                    />
+                  </Bar>
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="total_qty"
+                    stroke="hsl(var(--secondary))"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
 
             {/* Graphe 2 : Top 10 points de stockage */}
-            <div className="mt-60 h-64">
+            <div className="mt-70 h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={analytics?.top_storage_points || []}>
+                <BarChart
+                  data={(analytics?.top_storage_points || []).filter(d => Number(d.total_volume) > 0)}
+                  margin={{ top: 24, right: 12, bottom: 40, left: 12 }}
+                  barCategoryGap={12}
+                  barGap={4}>
+
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="label" angle={-30} textAnchor="end" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="total_volume" fill="hsl(var(--primary))" />
+                  <XAxis
+                    dataKey="label"
+                    interval={0}
+                    angle={-30}
+                    textAnchor="end"
+                    tick={{ fontSize: 11 }}
+                    height={50}
+                  />
+                  <YAxis
+                    width={70}
+                    tickFormatter={(v) => fmtCompact(Number(v))}
+                    allowDecimals={false}
+                  />
+                  <Tooltip
+                    formatter={(val: any) => fmtFull(Number(val))}
+                    labelFormatter={(lbl) => `Emplacement: ${lbl}`}
+                  />
+                  <Bar dataKey="total_volume" fill="hsl(var(--primary))">
+                    <LabelList
+                      dataKey="total_volume"
+                      position="top"
+                      formatter={(v: any) => fmtCompact(Number(v))}
+                      className="text-[10px]"
+                    />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
